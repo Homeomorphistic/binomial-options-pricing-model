@@ -33,3 +33,10 @@ def test_expected_payoff(r, delta_t, u, d, v_u, v_d, v):
                            desired=v, rtol=1e-2)
 
 
+@pytest.mark.parametrize("S, K, delta_t, T, u, d, leafs",
+                         [(20, 21, 3/12, 1/2, 1.1, 0.9, np.array([16.2, 19.8, 24.2])),
+                          (50, 52, 1, 2, 1.2, 0.8, np.array([32, 48, 72]))
+                          ])
+def test_binomial_leafs(S, K, delta_t, T, u, d, leafs):
+    return assert_allclose(actual=bopm.binomial_leafs(S, K, delta_t, T, u, d),
+                           desired=leafs)
