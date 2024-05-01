@@ -38,5 +38,13 @@ def test_expected_payoff(r, delta_t, u, d, v_u, v_d, v):
                           (50, 52, 1, 2, 1.2, 0.8, np.array([32, 48, 72]))
                           ])
 def test_binomial_leafs(S, K, delta_t, T, u, d, leafs):
-    return assert_allclose(actual=bopm.binomial_leafs(S, K, delta_t, T, u, d),
+    return assert_allclose(actual=bopm.binomial_tree(S, K, delta_t, T, u, d),
                            desired=leafs)
+
+
+@pytest.mark.parametrize("r, S, K, delta_t, T, u, d, value",
+                         [(.12, 20, 21, 3/12, 1/2, 1.1, 0.9, 1.28)])
+def test_pricing(r, S, K, delta_t, T, u, d, value):
+    v, _ = bopm.price_option(r, S, K, delta_t, T, u, d)
+    return assert_allclose(actual=v,
+                           desired=value, rtol=1e-2)

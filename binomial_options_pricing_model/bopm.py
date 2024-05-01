@@ -1,3 +1,5 @@
+from typing import Callable
+
 import numpy as np
 from numpy import ndarray
 
@@ -41,7 +43,7 @@ def risk_neutral_probability(r: float, T: float,
 
 
 def expected_payoff(r: float, delta_t: float, u: float, d: float,
-                    v_u: float, v_d: float) -> float:
+                    v_u: ndarray[float], v_d: ndarray[float]) -> ndarray[float]:
     """Return risk-neutral probability for expiry T.
 
         :param r: risk-free rate of the market.
@@ -56,8 +58,8 @@ def expected_payoff(r: float, delta_t: float, u: float, d: float,
     return np.exp(-r*delta_t) * (p * v_u + (1-p) * v_d)
 
 
-def binomial_leafs(S: float, K: float, delta_t: float, T: float,
-                   u: float, d: float) -> ndarray:
+def binomial_tree(S: float, K: float, delta_t: float, T: float,
+                  u: float, d: float, only_leafs: bool = True) -> ndarray:
     """Produce a vector of the last level of the binomial tree.
 
     :param S: current underlying asset price.
@@ -66,19 +68,35 @@ def binomial_leafs(S: float, K: float, delta_t: float, T: float,
     :param T: expiration date of an option in years.
     :param u: price up-scaling factor.
     :param d: price down-scaling factor.
-    :returns: vector of the last level of the binomial tree.
+    :param only_leafs: compute only leafs or whole tree?
+    :returns: vector of the last level of the binomial tree or the whole tree.
     """
     n = int(T / delta_t)
     i = np.arange(n + 1)  # i = 0, 1, ..., n -1, n
     j = n - i  # j = n, n-1, ..., 1, 0
-    V = S * np.ones(n + 1)
-    V = V * (u**i) * (d**j)  # V = S * u^i * d^(n-i)
-    return V
+    S = S * np.ones(n + 1)
+    leafs = S * (u**i) * (d**j)  # leafs = S * u^i * d^(n-i)
+
+    if only_leafs:
+        return leafs
+    else:
+        tree = [leafs]
+        for k in range(n):
+            # for each level of the tree we have less nodes (and steps) to reach them
+            i = np.delete(i, n - k)
+            j = np.delete(j, 0)
+            S = np.delete(S, 0)
+            tree.append(S * (u ** i) * (d ** j))
+
+        tree.reverse()
+        return tree
 
 
 def price_option(r: float, S: float, K: float,
                  delta_t: float, T: float,
-                 u: float, d: float) -> float:
+                 u: float, d: float,
+                 payoff: Callable[..., ndarray[float]] = call_payoff) \
+        -> tuple[ndarray[float], list]:
     """Price an option.
 
     :param r: risk-free rate of the market.
@@ -88,21 +106,24 @@ def price_option(r: float, S: float, K: float,
     :param T: expiration date of an option in years.
     :param u: price up-scaling factor.
     :param d: price down-scaling factor.
+    :param payoff: payoff function of an option.
     :returns: price of an option.
     """
     # Get the last level of binomial tree.
     n = int(T / delta_t)
-    v = binomial_leafs(S, K, delta_t, T, u, d)
-    v = call_payoff(v, K)
+    v = binomial_tree(S, K, delta_t, T, u, d)
+    v = payoff(v, K)
+    # Keep each level of the tree.
+    history = [v]
 
     for i in range(n):
-        v_u = np.delete(v, 0)
-        v_d = np.delete(v, n-i)
-        print(v)
+        v_u = np.delete(v, 0)  # remove first, so that we have v_i+1
+        v_d = np.delete(v, n-i)  # remove last, so that we have v_i,
         v = expected_payoff(r, delta_t, u, d, v_u, v_d)
+        history.append(v)
 
-    print(v)
-    return v
+    return v[0], history # [0] to unpack array with one element
+
 
 if __name__ == "__main__":
     delta_t = 3/12#1/12
@@ -114,4 +135,5 @@ if __name__ == "__main__":
     d = 0.9#1/u
     r = .12#.02
     S = 20#50
-    price_option(r, S, K, delta_t, T, u, d)
+    v = binomial_tree(S, K, delta_t, T, u, d, only_leafs=True)
+    print(v)
