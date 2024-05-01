@@ -92,12 +92,12 @@ def binomial_tree(S: float, K: float, delta_t: float, T: float,
         return tree
 
 
-def price_option(r: float, S: float, K: float,
-                 delta_t: float, T: float,
-                 u: float, d: float,
-                 payoff: Callable[..., ndarray[float]] = call_payoff) \
+def price_european_option(r: float, S: float, K: float,
+                          delta_t: float, T: float,
+                          u: float, d: float,
+                          payoff: Callable[..., ndarray[float]] = call_payoff) \
         -> tuple[ndarray[float], list]:
-    """Price an option.
+    """Price a european option.
 
     :param r: risk-free rate of the market.
     :param S: current underlying asset price.
@@ -111,7 +111,8 @@ def price_option(r: float, S: float, K: float,
     """
     # Get the last level of binomial tree.
     n = int(T / delta_t)
-    v = binomial_tree(S, K, delta_t, T, u, d)
+    # If the option is european, we need only leafs.
+    v = binomial_tree(S, K, delta_t, T, u, d, only_leafs=True)
     v = payoff(v, K)
     # Keep each level of the tree.
     history = [v]
@@ -122,7 +123,119 @@ def price_option(r: float, S: float, K: float,
         v = expected_payoff(r, delta_t, u, d, v_u, v_d)
         history.append(v)
 
-    return v[0], history # [0] to unpack array with one element
+    return v[0], history  # [0] to unpack array with one element
+
+
+def price_european_put(r: float, S: float, K: float,
+                          delta_t: float, T: float,
+                          u: float, d: float) \
+        -> tuple[ndarray[float], list]:
+    """Price an european put option.
+
+    :param r: risk-free rate of the market.
+    :param S: current underlying asset price.
+    :param K: strike price.
+    :param delta_t: time step.
+    :param T: expiration date of an option in years.
+    :param u: price up-scaling factor.
+    :param d: price down-scaling factor.
+    :returns: price of an option.
+    """
+    return price_european_option(r, S, K, delta_t, T, u, d, payoff=put_payoff)
+
+
+def price_european_call(r: float, S: float, K: float,
+                          delta_t: float, T: float,
+                          u: float, d: float) \
+        -> tuple[ndarray[float], list]:
+    """Price an european call option.
+
+    :param r: risk-free rate of the market.
+    :param S: current underlying asset price.
+    :param K: strike price.
+    :param delta_t: time step.
+    :param T: expiration date of an option in years.
+    :param u: price up-scaling factor.
+    :param d: price down-scaling factor.
+    :returns: price of an option.
+    """
+    return price_european_option(r, S, K, delta_t, T, u, d, payoff=call_payoff)
+
+
+def price_american_option(r: float, S: float, K: float,
+                          delta_t: float, T: float,
+                          u: float, d: float,
+                          payoff: Callable[..., ndarray[float]] = put_payoff) \
+        -> tuple[ndarray[float], list]:
+    """Price an american option.
+
+    :param r: risk-free rate of the market.
+    :param S: current underlying asset price.
+    :param K: strike price.
+    :param delta_t: time step.
+    :param T: expiration date of an option in years.
+    :param u: price up-scaling factor.
+    :param d: price down-scaling factor.
+    :param payoff: payoff function of an option.
+    :returns: price of an option.
+    """
+    # Get the last level of binomial tree.
+    n = int(T / delta_t)
+    # If the option is american, get the full tree.
+    tree = binomial_tree(S, K, delta_t, T, u, d, only_leafs=False)
+    value = payoff(tree[n], K)
+    # Keep each level of the tree.
+    history = [value]
+
+    for i in range(n):
+        value_up = np.delete(value, 0)  # remove first, so that we have v_i+1
+        value_down = np.delete(value, n-i)  # remove last, so that we have v_i,
+        payoffs = payoff(tree[n - i - 1], K)
+        expected_payoffs = expected_payoff(r, delta_t, u, d, value_up, value_down)
+
+        # Get the expected and actual payoffs
+        profitability = np.vstack((expected_payoffs, payoffs))
+        # Is exercising an option is more profitable than expected payoff?
+        value = np.max(profitability, axis=0)
+        history.append(value)
+
+    return value[0], history  # [0] to unpack array with one element
+
+
+def price_american_put(r: float, S: float, K: float,
+                          delta_t: float, T: float,
+                          u: float, d: float) \
+        -> tuple[ndarray[float], list]:
+    """Price an american put option.
+
+    :param r: risk-free rate of the market.
+    :param S: current underlying asset price.
+    :param K: strike price.
+    :param delta_t: time step.
+    :param T: expiration date of an option in years.
+    :param u: price up-scaling factor.
+    :param d: price down-scaling factor.
+    :returns: price of an option.
+    """
+    return price_american_option(r, S, K, delta_t, T, u, d, payoff=put_payoff)
+
+
+def price_american_call(r: float, S: float, K: float,
+                          delta_t: float, T: float,
+                          u: float, d: float) \
+        -> tuple[ndarray[float], list]:
+    """Price an american call option.
+
+    :param r: risk-free rate of the market.
+    :param S: current underlying asset price.
+    :param K: strike price.
+    :param delta_t: time step.
+    :param T: expiration date of an option in years.
+    :param u: price up-scaling factor.
+    :param d: price down-scaling factor.
+    :returns: price of an option.
+    """
+    return price_american_option(r, S, K, delta_t, T, u, d, payoff=call_payoff)
 
 
 if __name__ == "__main__":
@@ -135,5 +248,5 @@ if __name__ == "__main__":
     d = 0.9#1/u
     r = .12#.02
     S = 20#50
-    v = binomial_tree(S, K, delta_t, T, u, d, only_leafs=True)
-    print(v)
+    v, h = price_american_option(r, S, K, delta_t, T, u, d)
+    print(h)
