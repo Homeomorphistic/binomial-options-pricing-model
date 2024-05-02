@@ -275,9 +275,23 @@ def crr_price_option(r: float, S: float, K: float, delta_t: float, T: float,
 
 
 if __name__ == "__main__":
-    sigma = np.log(1.1)/np.sqrt(3/12)
-    r, S, K, delta_t, T, up, down = .12, 20, 21, 3/12, 1, 1.1, 0.9
-    _, h = price_european_call(r, S, K, delta_t, T, up, down)
-    print(h)
-    _, h2 = crr_price_option(r, S, K, delta_t, T, sigma)
-    print(h2)
+    r, S, K, delta_t, T, sigma = .02, 50, 48, 1/12, 2, .3
+    K_i = np.linspace(40, 60, num=24)
+    T_i = (np.arange(1, 25) + 1)/12
+    sigma_i = np.linspace(0.1, 1, num=24)
+    n = len(K_i)
+    V_k = np.zeros(n)
+    V_t = np.zeros(n)
+    V_s = np.zeros(n)
+    for i in range(n):
+        V_k[i], _ = crr_price_option(r, S, K_i[i], delta_t, T, sigma)
+        V_t[i], _ = crr_price_option(r, S, K, delta_t, T_i[i], sigma)
+        V_s[i], _ = crr_price_option(r, S, K, delta_t, T, sigma_i[i])
+
+    import matplotlib.pyplot as plt
+    plt.plot(K_i, V_k)
+    plt.show()
+    plt.plot(T_i, V_t)
+    plt.show()
+    plt.plot(sigma_i, V_s)
+    plt.show()
