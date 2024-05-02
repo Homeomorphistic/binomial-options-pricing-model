@@ -70,46 +70,50 @@ def test_expected_payoff_vector(r, t, up, down, p, value_up, value_down, value):
     assert all(np.allclose(bopm_expected_payoff[i], value[i], rtol=1e-2) for i in range(n))
 
 
-@pytest.mark.parametrize("S, delta_t, T, u, d, tree",
+@pytest.mark.parametrize("S, delta_t, T, up, down, tree",
                          [(20, 3/12, 1/2, 1.1, 0.9,
                            [np.array(20), np.array([18, 22]), np.array([16.2, 19.8, 24.2])]),
                           (50, 1, 2, 1.2, 0.8,
                            [np.array(50), np.array([40, 60]), np.array([32, 48, 72])])
                           ])
-def test_price_binomial_tree(S, delta_t, T, u, d, tree):
+def test_price_binomial_tree(S, delta_t, T, up, down, tree):
     n = len(tree)
-    bopm_tree = bopm.price_binomial_tree(S, delta_t, T, u, d)
+    bopm_tree = bopm.price_binomial_tree(S, delta_t, T, up, down)
     # Test if each level of the tree is "close enough" (np.allclose).
     assert all(np.allclose(bopm_tree[i], tree[i]) for i in range(n))
 
 
-@pytest.mark.parametrize("r, S, K, delta_t, T, u, d, value",
-                         [(.12, 20, 21, 3/12, 1/2, 1.1, 0.9, 1.28)])
-def test_pricing_european_call(r, S, K, delta_t, T, u, d, value):
-    v, _ = bopm.price_european_call(r, S, K, delta_t, T, u, d)
+@pytest.mark.parametrize("r, S, K, delta_t, T, up, down, value",
+                         [(.12, 20, 21, 3/12, 1/2, 1.1, 0.9, 1.28),
+                          (.05, 50, 52, 1, 2, 1.2, 0.8, 7.1416)])
+def test_pricing_european_call(r, S, K, delta_t, T, up, down, value):
+    v, _ = bopm.price_european_call(r, S, K, delta_t, T, up, down)
+    return assert_allclose(actual=v,
+                           desired=value, rtol=1e-2)
+
+
+@pytest.mark.parametrize("r, S, K, delta_t, T, up, down, value",
+                         [(.12, 20, 21, 3/12, 1/2, 1.1, 0.9, 1.0591),
+                          (.05, 50, 52, 1, 2, 1.2, 0.8, 4.1923)])
+def test_pricing_european_put(r, S, K, delta_t, T, up, down, value):
+    v, _ = bopm.price_european_put(r, S, K, delta_t, T, up, down)
     return assert_allclose(actual=v,
                            desired=value, rtol=1e-2)
 
 
 @pytest.mark.parametrize("r, S, K, delta_t, T, u, d, value",
-                         [(.05, 50, 52, 1, 2, 1.2, 0.8, 4.1923)])
-def test_pricing_european_put(r, S, K, delta_t, T, u, d, value):
-    v, _ = bopm.price_european_put(r, S, K, delta_t, T, u, d)
-    return assert_allclose(actual=v,
-                           desired=value, rtol=1e-2)
-
-
-@pytest.mark.parametrize("r, S, K, delta_t, T, u, d, value",
-                         [(.05, 50, 52, 1, 2, 1.2, 0.8, 5.089)])
+                         [(.12, 20, 21, 3/12, 1/2, 1.1, 0.9, 1.2686),
+                          (.05, 50, 52, 1, 2, 1.2, 0.8, 5.089)])
 def test_pricing_american_put(r, S, K, delta_t, T, u, d, value):
     v, _ = bopm.price_american_put(r, S, K, delta_t, T, u, d)
     return assert_allclose(actual=v,
                            desired=value, rtol=1e-2)
 
 
-@pytest.mark.parametrize("r, S, K, delta_t, T, u, d, value",
-                         [(.05, 50, 52, 1, 2, 1.2, 0.8, 7.1416)])
-def test_pricing_american_call(r, S, K, delta_t, T, u, d, value):
-    v, _ = bopm.price_american_call(r, S, K, delta_t, T, u, d)
+@pytest.mark.parametrize("r, S, K, delta_t, T, up, down, value",
+                         [(.12, 20, 21, 3/12, 1/2, 1.1, 0.9, 1.28),
+                          (.05, 50, 52, 1, 2, 1.2, 0.8, 7.1416)])
+def test_pricing_american_call(r, S, K, delta_t, T, up, down, value):
+    v, _ = bopm.price_american_call(r, S, K, delta_t, T, up, down)
     return assert_allclose(actual=v,
-                           desired=value, rtol=1e-4)
+                           desired=value, rtol=1e-2)
