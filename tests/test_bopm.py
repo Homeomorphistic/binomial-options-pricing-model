@@ -82,6 +82,10 @@ def test_price_binomial_tree(S, delta_t, T, up, down, tree):
     # Test if each level of the tree is "close enough" (np.allclose).
     assert all(np.allclose(bopm_tree[i], tree[i]) for i in range(n))
 
+####################################################################
+####################################################################
+# OPTION PRICING
+
 
 @pytest.mark.parametrize("r, S, K, delta_t, T, up, down, value",
                          [(.12, 20, 21, 3/12, 1/2, 1.1, 0.9, 1.28),
@@ -117,3 +121,17 @@ def test_pricing_american_call(r, S, K, delta_t, T, up, down, value):
     v, _ = bopm.price_american_call(r, S, K, delta_t, T, up, down)
     return assert_allclose(actual=v,
                            desired=value, rtol=1e-2)
+
+
+####################################################################
+####################################################################
+# CCR METHOD
+
+
+@pytest.mark.parametrize("r, S, K, delta_t, T, sigma, value",
+                         [(.12, 20, 21, 3/12, 1/2, np.log(1.1)/np.sqrt(3/12), 1.28),
+                          (.05, 50, 52, 1, 2, np.log(1.2)/np.sqrt(1), 4.1923)])
+def test_crr_european_put(r, S, K, delta_t, T, sigma, value):
+    v, _ = bopm.crr_price_option(r, S, K, delta_t, T, sigma, american=False, call=False)
+    return assert_allclose(actual=v,
+                           desired=value, atol=.75)

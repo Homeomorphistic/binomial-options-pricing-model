@@ -152,6 +152,7 @@ def _price_option(r: float, S: float, K: float,
 
         history.append(value)
 
+    history.reverse()
     return value[0], history  # [0] to unpack array with one element
 
 
@@ -243,5 +244,40 @@ def price_american_call(r: float, S: float, K: float, delta_t: float,
     return _price_option(r, S, K, delta_t, T, up, down, american=True, payoff=call_payoff)
 
 
+def crr_price_option(r: float, S: float, K: float, delta_t: float, T: float,
+                     sigma: float, american: bool = False, call: bool = True) -> tuple[ndarray, list]:
+    """Price a european put@K with maturity T.
+
+    Prices a european put option given the underlying asset and market parameters.
+    We assume discrete time steps and a lattice of available prices for the asset.
+
+    Use Cox, Ross and Rubinstein method to obtain up and down factors
+    through volatility of an asset (sigma):
+    up = e^(sigma * sqrt(delta_y)) = 1/d
+
+    It returns a tuple containing present price and a binomial tree
+    with option prices at each node.
+
+    :param r: risk-free rate of the market.
+    :param S: current underlying asset price.
+    :param K: strike price.
+    :param delta_t: time step (in years).
+    :param T: maturity of an option (in years).
+    :param sigma: volatility of an asset.
+    :param american: is it american option?
+    :param call: is it a call option? Otherwise, put.
+    :returns: tuple of price of an option and a binomial tree.
+    """
+    up = np.exp(sigma * np.sqrt(delta_t))
+    down = 1/up
+    payoff = call_payoff if call else put_payoff
+    return _price_option(r, S, K, delta_t, T, up, down, american, payoff)
+
+
 if __name__ == "__main__":
-    print(risk_neutral_probability(.12, 3/12, 1.1, 0.9))
+    sigma = np.log(1.1)/np.sqrt(3/12)
+    r, S, K, delta_t, T, up, down = .12, 20, 21, 3/12, 1, 1.1, 0.9
+    _, h = price_european_call(r, S, K, delta_t, T, up, down)
+    print(h)
+    _, h2 = crr_price_option(r, S, K, delta_t, T, sigma)
+    print(h2)
