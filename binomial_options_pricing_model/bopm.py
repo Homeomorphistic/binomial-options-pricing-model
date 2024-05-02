@@ -1,252 +1,247 @@
-from typing import Callable
+"""Binomial options pricing model.
+
+This script contains functions that build up a binomial options pricing model,
+formalized by Cox, Ross and Rubinstein (1979).
+
+"""
+from typing import Callable, Any
 
 import numpy as np
 from numpy import ndarray
 
 
-def call_payoff(S: float, K: float) -> ndarray:
+def call_payoff(S: ndarray, K: float) -> ndarray:
     """Return payoff of a call@K given asset price S_T.
 
     :param S: current underlying asset price.
     :param K: strike price.
     :returns: payoff of a call@K.
     """
-    d = np.array(S - K)
-    d[d < 0] = 0  # take only positive.
-    return d
+    payoff = np.array(S - K)
+    payoff[payoff < 0] = 0  # take only positive.
+    return payoff
 
 
-def put_payoff(S: float, K: float) -> ndarray:
+def put_payoff(S: ndarray, K: float) -> ndarray:
     """Return payoff of a put@K given asset price S_T.
 
     :param S: current underlying asset price.
     :param K: strike price.
     :returns: payoff of a put@K.
     """
-    d = np.array(K - S)
-    d[d < 0] = 0  # take only positive.
-    return d
+    payoff = np.array(K - S)
+    payoff[payoff < 0] = 0  # take only positive.
+    return payoff
 
 
-def risk_neutral_probability(r: float, T: float,
-                             u: float, d: float) -> float:
-    """Return risk-neutral probability for expiry T.
+def risk_neutral_probability(r: float, t: float,
+                             up: float, down: float) -> float:
+    """Return risk-neutral probability for a period of t.
 
     :param r: risk-free rate of the market.
-    :param T: expiration date of an option in years.
-    :param u: price up-scaling factor.
-    :param d: price down-scaling factor.
-    :returns: risk-neutral probability at expiry T.
+    :param t: time period (in years).
+    :param up: price up-scaling factor.
+    :param down: price down-scaling factor.
+    :returns: risk-neutral probability for a period of t.
     """
-    # TODO add d < e^rt < u constraint.
-    return (np.exp(r*T) - d) / (u - d)
+    # d < e^rt < u constraint makes sure it's a probability.
+    if down < np.exp(r * t) < up:
+        return (np.exp(r * t) - down) / (up - down)
+    else:
+        raise ValueError("up or down scaling factor is out of constraints.")
 
 
-def expected_payoff(r: float, delta_t: float, u: float, d: float,
-                    v_u: ndarray[float], v_d: ndarray[float]) -> ndarray[float]:
-    """Return risk-neutral probability for expiry T.
+def expected_payoff(r: float, t: float, up: float, down: float, p: float,
+                    value_up: ndarray, value_down: ndarray) -> ndarray:
+    """Return expected payoff of an option.
 
-        :param r: risk-free rate of the market.
-        :param delta_t: time step.
-        :param u: price up-scaling factor.
-        :param d: price down-scaling factor.
-        :param v_d: value of an option at down child.
-        :param v_u: value of an option at upper child.
-        :returns: value of an option at present node.
+    :param r: risk-free rate of the market.
+    :param t: time period (in years).
+    :param up: price up-scaling factor.
+    :param down: price down-scaling factor.
+    :param p: risk-neutral probability.
+    :param value_down: value of an option at down child.
+    :param value_up: value of an option at upper child.
+    :returns: expected payoff of an option at present node.
     """
-    p = risk_neutral_probability(r, delta_t, u, d)
-    return np.exp(-r*delta_t) * (p * v_u + (1-p) * v_d)
+    return np.exp(-r * t) * (p * value_up + (1 - p) * value_down)
 
 
-def binomial_tree(S: float, K: float, delta_t: float, T: float,
-                  u: float, d: float, only_leafs: bool = True) -> ndarray:
-    """Produce a vector of the last level of the binomial tree.
+def price_binomial_tree(S: float, delta_t: float, T: float,
+                        up: float, down: float) -> list[ndarray]:
+    """Produce a price binomial tree.
+
+    It produces binomial tree, with asset prices that can go only up (S*up)
+    or down (S*down) after delta_t time.
+    The tree is represented by the list containing each level of the tree.
 
     :param S: current underlying asset price.
-    :param K: strike price.
-    :param delta_t: time step.
-    :param T: expiration date of an option in years.
-    :param u: price up-scaling factor.
-    :param d: price down-scaling factor.
-    :param only_leafs: compute only leafs or whole tree?
-    :returns: vector of the last level of the binomial tree or the whole tree.
+    :param delta_t: time step (in years).
+    :param T: maturity of an option (in years).
+    :param up: price up-scaling factor.
+    :param down: price down-scaling factor.
+    :returns: list of binomial tree levels.
     """
+    # Number of levels of a binomial tree.
     n = int(T / delta_t)
-    i = np.arange(n + 1)  # i = 0, 1, ..., n -1, n
+
+    i = np.arange(n + 1)  # i = 0, 1, ..., n - 1, n
     j = n - i  # j = n, n-1, ..., 1, 0
     S = S * np.ones(n + 1)
-    leafs = S * (u**i) * (d**j)  # leafs = S * u^i * d^(n-i)
+    leafs = S * (up ** i) * (down ** j)  # leafs = S * up^i * down^(n-i)
 
-    if only_leafs:
-        return leafs
-    else:
-        tree = [leafs]
-        for k in range(n):
-            # for each level of the tree we have less nodes (and steps) to reach them
-            i = np.delete(i, n - k)
-            j = np.delete(j, 0)
-            S = np.delete(S, 0)
-            tree.append(S * (u ** i) * (d ** j))
+    tree = [leafs]
+    for k in range(n):
+        # for each level of the tree we have less nodes (and steps) to reach them
+        i = np.delete(i, n - k)  # i = 0, 1, ..., n-k-1, n-k
+        j = np.delete(j, 0)  # j = n-k, n-k-1, ..., 1, 0
+        S = np.delete(S, 0)  # remove to match the length of i and j
+        tree.append(S * (up ** i) * (down ** j))
 
-        tree.reverse()
-        return tree
+    tree.reverse()
+    return tree
 
 
-def price_european_option(r: float, S: float, K: float,
-                          delta_t: float, T: float,
-                          u: float, d: float,
-                          payoff: Callable[..., ndarray[float]] = call_payoff) \
-        -> tuple[ndarray[float], list]:
-    """Price a european option.
+def _price_option(r: float, S: float, K: float,
+                  delta_t: float, T: float,
+                  up: float, down: float, american: bool = False,
+                  payoff: Callable[..., ndarray] = call_payoff) \
+        -> tuple[ndarray, list[ndarray]]:
+    """Price an option@K with maturity T.
+
+    Prices a european/american vanilla options given the underlying
+    asset and market parameters. We assume discrete time steps and a
+    lattice of available prices for the asset.
+    It returns a tuple containing present price and a binomial tree
+    with option prices at each node.
 
     :param r: risk-free rate of the market.
     :param S: current underlying asset price.
     :param K: strike price.
-    :param delta_t: time step.
-    :param T: expiration date of an option in years.
-    :param u: price up-scaling factor.
-    :param d: price down-scaling factor.
+    :param delta_t: time step (in years).
+    :param T: maturity of an option (in years).
+    :param up: price up-scaling factor.
+    :param down: price down-scaling factor.
+    :param american: is it american option?
     :param payoff: payoff function of an option.
-    :returns: price of an option.
+    :returns: tuple of price of an option and a binomial tree.
     """
-    # Get the last level of binomial tree.
+    # Number of levels of a binomial tree.
     n = int(T / delta_t)
-    # If the option is european, we need only leafs.
-    v = binomial_tree(S, K, delta_t, T, u, d, only_leafs=True)
-    v = payoff(v, K)
-    # Keep each level of the tree.
-    history = [v]
-
-    for i in range(n):
-        v_u = np.delete(v, 0)  # remove first, so that we have v_i+1
-        v_d = np.delete(v, n-i)  # remove last, so that we have v_i,
-        v = expected_payoff(r, delta_t, u, d, v_u, v_d)
-        history.append(v)
-
-    return v[0], history  # [0] to unpack array with one element
-
-
-def price_european_put(r: float, S: float, K: float,
-                          delta_t: float, T: float,
-                          u: float, d: float) \
-        -> tuple[ndarray[float], list]:
-    """Price an european put option.
-
-    :param r: risk-free rate of the market.
-    :param S: current underlying asset price.
-    :param K: strike price.
-    :param delta_t: time step.
-    :param T: expiration date of an option in years.
-    :param u: price up-scaling factor.
-    :param d: price down-scaling factor.
-    :returns: price of an option.
-    """
-    return price_european_option(r, S, K, delta_t, T, u, d, payoff=put_payoff)
-
-
-def price_european_call(r: float, S: float, K: float,
-                          delta_t: float, T: float,
-                          u: float, d: float) \
-        -> tuple[ndarray[float], list]:
-    """Price an european call option.
-
-    :param r: risk-free rate of the market.
-    :param S: current underlying asset price.
-    :param K: strike price.
-    :param delta_t: time step.
-    :param T: expiration date of an option in years.
-    :param u: price up-scaling factor.
-    :param d: price down-scaling factor.
-    :returns: price of an option.
-    """
-    return price_european_option(r, S, K, delta_t, T, u, d, payoff=call_payoff)
-
-
-def price_american_option(r: float, S: float, K: float,
-                          delta_t: float, T: float,
-                          u: float, d: float,
-                          payoff: Callable[..., ndarray[float]] = put_payoff) \
-        -> tuple[ndarray[float], list]:
-    """Price an american option.
-
-    :param r: risk-free rate of the market.
-    :param S: current underlying asset price.
-    :param K: strike price.
-    :param delta_t: time step.
-    :param T: expiration date of an option in years.
-    :param u: price up-scaling factor.
-    :param d: price down-scaling factor.
-    :param payoff: payoff function of an option.
-    :returns: price of an option.
-    """
-    # Get the last level of binomial tree.
-    n = int(T / delta_t)
-    # If the option is american, get the full tree.
-    tree = binomial_tree(S, K, delta_t, T, u, d, only_leafs=False)
+    # Risk-neutral probability.
+    p = risk_neutral_probability(r, delta_t, up, down)
+    # Price binomial tree.
+    tree = price_binomial_tree(S, delta_t, T, up, down)
+    # Values of an option at leafs (last level of the tree).
     value = payoff(tree[n], K)
-    # Keep each level of the tree.
+    # Store each level of the tree.
     history = [value]
 
     for i in range(n):
         value_up = np.delete(value, 0)  # remove first, so that we have v_i+1
         value_down = np.delete(value, n-i)  # remove last, so that we have v_i,
-        payoffs = payoff(tree[n - i - 1], K)
-        expected_payoffs = expected_payoff(r, delta_t, u, d, value_up, value_down)
+        value = expected_payoff(r, delta_t, up, down, p, value_up, value_down)
 
-        # Get the expected and actual payoffs
-        profitability = np.vstack((expected_payoffs, payoffs))
-        # Is exercising an option is more profitable than expected payoff?
-        value = np.max(profitability, axis=0)
+        if american:  # if american, check if it's profitable to exercise option.
+            # Expected and actual payoffs at current tree level.
+            payoffs = payoff(tree[n - i - 1], K)
+            expected_payoffs = expected_payoff(r, delta_t, up, down, p, value_up, value_down)
+            profitability = np.vstack((expected_payoffs, payoffs))
+            # Is exercising an option more profitable than expected payoff?
+            value = np.max(profitability, axis=0)
+
         history.append(value)
 
     return value[0], history  # [0] to unpack array with one element
 
 
-def price_american_put(r: float, S: float, K: float,
-                          delta_t: float, T: float,
-                          u: float, d: float) \
-        -> tuple[ndarray[float], list]:
-    """Price an american put option.
+def price_european_put(r: float, S: float, K: float, delta_t: float,
+                       T: float, up: float, down: float) -> tuple[ndarray, list]:
+    """Price a european put@K with maturity T.
+
+    Prices a european put option given the underlying
+    asset and market parameters. We assume discrete time steps and a
+    lattice of available prices for the asset.
+    It returns a tuple containing present price and a binomial tree
+    with option prices at each node.
 
     :param r: risk-free rate of the market.
     :param S: current underlying asset price.
     :param K: strike price.
-    :param delta_t: time step.
-    :param T: expiration date of an option in years.
-    :param u: price up-scaling factor.
-    :param d: price down-scaling factor.
-    :returns: price of an option.
+    :param delta_t: time step (in years).
+    :param T: maturity of an option (in years).
+    :param up: price up-scaling factor.
+    :param down: price down-scaling factor.
+    :returns: tuple of price of an option and a binomial tree.
     """
-    return price_american_option(r, S, K, delta_t, T, u, d, payoff=put_payoff)
+    return _price_option(r, S, K, delta_t, T, up, down, payoff=put_payoff)
 
 
-def price_american_call(r: float, S: float, K: float,
-                          delta_t: float, T: float,
-                          u: float, d: float) \
-        -> tuple[ndarray[float], list]:
-    """Price an american call option.
+def price_european_call(r: float, S: float, K: float, delta_t: float,
+                        T: float, up: float, down: float) -> tuple[ndarray, list]:
+    """Price a european call@K with maturity T.
+
+    Prices a european call option given the underlying
+    asset and market parameters. We assume discrete time steps and a
+    lattice of available prices for the asset.
+    It returns a tuple containing present price and a binomial tree
+    with option prices at each node.
 
     :param r: risk-free rate of the market.
     :param S: current underlying asset price.
     :param K: strike price.
-    :param delta_t: time step.
-    :param T: expiration date of an option in years.
-    :param u: price up-scaling factor.
-    :param d: price down-scaling factor.
-    :returns: price of an option.
+    :param delta_t: time step (in years).
+    :param T: maturity of an option (in years).
+    :param up: price up-scaling factor.
+    :param down: price down-scaling factor.
+    :returns: tuple of price of an option and a binomial tree.
     """
-    return price_american_option(r, S, K, delta_t, T, u, d, payoff=call_payoff)
+    return _price_option(r, S, K, delta_t, T, up, down, payoff=call_payoff)
+
+
+def price_american_put(r: float, S: float, K: float, delta_t: float,
+                       T: float, up: float, down: float) -> tuple[ndarray, list]:
+    """Price an american put@K with maturity T.
+
+    Prices a american put option given the underlying
+    asset and market parameters. We assume discrete time steps and a
+    lattice of available prices for the asset.
+    It returns a tuple containing present price and a binomial tree
+    with option prices at each node.
+
+    :param r: risk-free rate of the market.
+    :param S: current underlying asset price.
+    :param K: strike price.
+    :param delta_t: time step (in years).
+    :param T: maturity of an option (in years).
+    :param up: price up-scaling factor.
+    :param down: price down-scaling factor.
+    :returns: tuple of price of an option and a binomial tree.
+    """
+    return _price_option(r, S, K, delta_t, T, up, down, american=True, payoff=put_payoff)
+
+
+def price_american_call(r: float, S: float, K: float, delta_t: float,
+                        T: float, up: float, down: float) -> tuple[ndarray, list]:
+    """Price an american call@K with maturity T.
+
+    Prices a american put option given the underlying
+    asset and market parameters. We assume discrete time steps and a
+    lattice of available prices for the asset.
+    It returns a tuple containing present price and a binomial tree
+    with option prices at each node.
+
+    :param r: risk-free rate of the market.
+    :param S: current underlying asset price.
+    :param K: strike price.
+    :param delta_t: time step (in years).
+    :param T: maturity of an option (in years).
+    :param up: price up-scaling factor.
+    :param down: price down-scaling factor.
+    :returns: tuple of price of an option and a binomial tree.
+    """
+    return _price_option(r, S, K, delta_t, T, up, down, american=True, payoff=call_payoff)
 
 
 if __name__ == "__main__":
-    delta_t = 3/12#1/12
-    T = 1/2#2
-    n = int(T / delta_t)
-    K = 21#48
-    sigma = .3
-    u = 1.1#np.exp(sigma * np.sqrt(delta_t))
-    d = 0.9#1/u
-    r = .12#.02
-    S = 20#50
-    v, h = price_american_option(r, S, K, delta_t, T, u, d)
-    print(h)
+    print(risk_neutral_probability(.12, 3/12, 1.1, 0.9))

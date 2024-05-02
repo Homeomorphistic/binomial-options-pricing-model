@@ -7,50 +7,78 @@ import binomial_options_pricing_model.bopm as bopm
 
 @pytest.mark.parametrize("S, K, payoff",
                          [(22, 21, 1), (18, 21, 0)])
-def test_call_payoff(S, K, payoff):
+def test_call_payoff_scalar(S, K, payoff):
     assert bopm.call_payoff(S, K) == payoff
 
 
 @pytest.mark.parametrize("S, K, payoff",
+                         [(np.array([22, 18]), 21, np.array([1, 0]))])
+def test_call_payoff_vector(S, K, payoff):
+    n = len(payoff)
+    bopm_call_payoff = bopm.call_payoff(S, K)
+    assert all(np.allclose(bopm_call_payoff[i], payoff[i]) for i in range(n))
+
+
+@pytest.mark.parametrize("S, K, payoff",
                          [(22, 21, 0), (18, 21, 3)])
-def test_put_payoff(S, K, payoff):
+def test_put_payoff_scalar(S, K, payoff):
     assert bopm.put_payoff(S, K) == payoff
 
 
-@pytest.mark.parametrize("r, T, u, d, prob",
-                         [(.12, 3/12, 1.1, 0.9, .6523)])
-def test_risk_neutral_probability(r, T, u, d, prob):
-    return assert_allclose(actual=bopm.risk_neutral_probability(r, T, u, d),
+@pytest.mark.parametrize("S, K, payoff",
+                         [(np.array([22, 18]), 21, np.array([0, 3]))])
+def test_put_payoff_vector(S, K, payoff):
+    n = len(payoff)
+    bopm_call_payoff = bopm.put_payoff(S, K)
+    assert all(np.allclose(bopm_call_payoff[i], payoff[i]) for i in range(n))
+
+
+@pytest.mark.parametrize("r, t, up, down, prob",
+                         [(.12, 3/12, 1.1, 0.9, .6523),
+                          (.05, 1, 1.2, 0.8, .6282)])
+def test_risk_neutral_probability(r, t, up, down, prob):
+    return assert_allclose(actual=bopm.risk_neutral_probability(r, t, up, down),
                            desired=prob, rtol=1e-4)
 
 
-@pytest.mark.parametrize("r, delta_t, u, d, v_u, v_d, v",
+@pytest.mark.parametrize("r, t, up, down",
+                         [(.12, 3/12, 1.02, 0.9),
+                          (.12, 3/12, 1.1, 1.04)])
+def test_risk_neutral_probability_exception(r, t, up, down):
+    with pytest.raises(ValueError):
+        bopm.risk_neutral_probability(r, t, up, down)
+
+
+@pytest.mark.parametrize("r, t, up, down, value_up, value_down, value",
                          [(.12, 3/12, 1.1, 0.9, 3.2, 0, 2.0257),
                           (.12, 3/12, 1.1, 0.9, 0, 0, 0),
                           (.12, 3/12, 1.1, 0.9, 2.0257, 0, 1.28)])
-def test_expected_payoff(r, delta_t, u, d, v_u, v_d, v):
-    return assert_allclose(actual=bopm.expected_payoff(r, delta_t, u, d, v_u, v_d),
-                           desired=v, rtol=1e-2)
+def test_expected_payoff(r, t, up, down, value_up, value_down, value):
+    p = bopm.risk_neutral_probability(r, t, up, down)
+    return assert_allclose(actual=bopm.expected_payoff(r, t, up, down, p, value_up, value_down),
+                           desired=value, rtol=1e-2)
 
 
-@pytest.mark.parametrize("S, K, delta_t, T, u, d, leafs",
-                         [(20, 21, 3/12, 1/2, 1.1, 0.9, np.array([16.2, 19.8, 24.2])),
-                          (50, 52, 1, 2, 1.2, 0.8, np.array([32, 48, 72]))
-                          ])
-def test_binomial_leafs(S, K, delta_t, T, u, d, leafs):
-    return assert_allclose(actual=bopm.binomial_tree(S, K, delta_t, T, u, d, only_leafs=True),
-                           desired=leafs)
+@pytest.mark.parametrize("r, t, up, down, p, value_up, value_down, value",
+                         [(.12, 3/12, 1.1, 0.9, 0.6523,
+                           np.array([3.2, 0, 2.0257]),
+                           np.array([0, 0, 0]),
+                           np.array([2.0257, 0, 1.28]))])
+def test_expected_payoff_vector(r, t, up, down, p, value_up, value_down, value):
+    n = len(value)
+    bopm_expected_payoff = bopm.expected_payoff(r, t, up, down, p, value_up, value_down)
+    assert all(np.allclose(bopm_expected_payoff[i], value[i], rtol=1e-2) for i in range(n))
 
 
-@pytest.mark.parametrize("S, K, delta_t, T, u, d, tree",
-                         [(20, 21, 3/12, 1/2, 1.1, 0.9,
+@pytest.mark.parametrize("S, delta_t, T, u, d, tree",
+                         [(20, 3/12, 1/2, 1.1, 0.9,
                            [np.array(20), np.array([18, 22]), np.array([16.2, 19.8, 24.2])]),
-                          (50, 52, 1, 2, 1.2, 0.8,
+                          (50, 1, 2, 1.2, 0.8,
                            [np.array(50), np.array([40, 60]), np.array([32, 48, 72])])
                           ])
-def test_binomial_tree(S, K, delta_t, T, u, d, tree):
+def test_price_binomial_tree(S, delta_t, T, u, d, tree):
     n = len(tree)
-    bopm_tree = bopm.binomial_tree(S, K, delta_t, T, u, d, only_leafs=False)
+    bopm_tree = bopm.price_binomial_tree(S, delta_t, T, u, d)
     # Test if each level of the tree is "close enough" (np.allclose).
     assert all(np.allclose(bopm_tree[i], tree[i]) for i in range(n))
 
@@ -80,8 +108,8 @@ def test_pricing_american_put(r, S, K, delta_t, T, u, d, value):
 
 
 @pytest.mark.parametrize("r, S, K, delta_t, T, u, d, value",
-                         [(.05, 50, 52, 1, 2, 1.2, 0.8, -1)]) # TODO find this value
+                         [(.05, 50, 52, 1, 2, 1.2, 0.8, 7.1416)])
 def test_pricing_american_call(r, S, K, delta_t, T, u, d, value):
     v, _ = bopm.price_american_call(r, S, K, delta_t, T, u, d)
     return assert_allclose(actual=v,
-                           desired=value, rtol=1e-2)
+                           desired=value, rtol=1e-4)
