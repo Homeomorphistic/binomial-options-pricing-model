@@ -275,23 +275,80 @@ def crr_price_option(r: float, S: float, K: float, delta_t: float, T: float,
 
 
 if __name__ == "__main__":
-    r, S, K, delta_t, T, sigma = .02, 50, 48, 1/12, 2, .3
-    K_i = np.linspace(40, 60, num=24)
-    T_i = (np.arange(1, 25) + 1)/12
-    sigma_i = np.linspace(0.1, 1, num=24)
-    n = len(K_i)
-    V_k = np.zeros(n)
-    V_t = np.zeros(n)
-    V_s = np.zeros(n)
-    for i in range(n):
-        V_k[i], _ = crr_price_option(r, S, K_i[i], delta_t, T, sigma)
-        V_t[i], _ = crr_price_option(r, S, K, delta_t, T_i[i], sigma)
-        V_s[i], _ = crr_price_option(r, S, K, delta_t, T, sigma_i[i])
-
+    r, S, K, delta_t, T, sigma = .02, 50, 40, 1/12, 2, .3
     import matplotlib.pyplot as plt
-    plt.plot(K_i, V_k)
-    plt.show()
-    plt.plot(T_i, V_t)
-    plt.show()
-    plt.plot(sigma_i, V_s)
-    plt.show()
+
+
+    def v_r(r, american=False, call=True):
+        n = len(r)
+        V = np.zeros(n)
+        for i in range(n):
+            V[i], _ = crr_price_option(r[i], S, K, delta_t, T, sigma, american, call)
+        return V
+
+
+    def v_s(S, american=False, call=True):
+        n = len(S)
+        V = np.zeros(n)
+        for i in range(n):
+            V[i], _ = crr_price_option(r, S[i], K, delta_t, T, sigma, american, call)
+        return V
+
+
+    def v_k(K, american=False, call=True):
+        n = len(K)
+        V = np.zeros(n)
+        for i in range(n):
+            V[i], _ = crr_price_option(r, S, K[i], delta_t, T, sigma, american, call)
+        return V
+
+
+    def v_sigma(sigma, american=False, call=True):
+        n = len(sigma)
+        V = np.zeros(n)
+        for i in range(n):
+            V[i], _ = crr_price_option(r, S, K, delta_t, T, sigma[i], american, call)
+        return V
+
+
+    def v_t(T, american=False, call=True):
+        n = len(T)
+        V = np.zeros(n)
+        for i in range(n):
+            V[i], _ = crr_price_option(r, S, K, delta_t, T[i], sigma, american, call)
+        return V
+
+
+    def v_delta_t(delta_t, american=False, call=True):
+        n = len(delta_t)
+        V = np.zeros(n)
+        for i in range(n):
+            V[i], _ = crr_price_option(r, S, K, delta_t[i], T, sigma, american, call)
+        return V
+
+    def plot_crr(r, S, K, delta_t, T, sigma):
+        figure, axis = plt.subplots(2, 3)
+        figure.legend(["EU call", "EU put", "AM call", "AM put"])
+
+        params = [r, S, K, delta_t, T, sigma]
+        v_functions = [v_r, v_s, v_k, v_delta_t, v_t, v_sigma]
+        for i, (param, v_func) in enumerate(zip(params, v_functions)):
+            param = np.linspace(.8 * param, 1.2 * param)
+
+            V_eu_call = v_func(param, american=False, call=True)
+            V_eu_put = v_func(param, american=False, call=False)
+            V_am_call = v_func(param, american=True, call=True)
+            V_am_put = v_func(param, american=True, call=False)
+
+            axis[i % 2, (i) % 3].plot(param, V_eu_call, color="blue", linestyle="dashed")
+            axis[i % 2, (i) % 3].plot(param, V_eu_put, color="red", linestyle="dashed")
+            axis[i % 2, (i) % 3].plot(param, V_am_call, color="blue")
+            axis[i % 2, (i) % 3].plot(param, V_am_put, color="red")
+
+            axis[i % 2, (i) % 3].set_xlabel("test")
+            axis[i % 2, (i) % 3].set_ylabel("Option value V")
+
+        plt.plot()
+
+        plot_crr(r, S, K, delta_t, T, sigma)
+        plt.plot()
