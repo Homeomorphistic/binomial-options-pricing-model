@@ -102,11 +102,9 @@ def price_binomial_tree(S: float, delta_t: float, T: float,
     return tree
 
 
-def _price_option(r: float, S: float, K: float,
-                  delta_t: float, T: float,
-                  up: float, down: float, american: bool = False,
-                  payoff: Callable[..., ndarray] = call_payoff) \
-        -> tuple[ndarray, list[ndarray]]:
+def price_option(r: float, S: float, K: float, delta_t: float,
+                 T: float, up: float, down: float,
+                 american: bool = False, call: bool = True) -> tuple[ndarray, list[ndarray]]:
     """Price an option@K with maturity T.
 
     Prices a european/american vanilla options given the underlying
@@ -123,9 +121,10 @@ def _price_option(r: float, S: float, K: float,
     :param up: price up-scaling factor.
     :param down: price down-scaling factor.
     :param american: is it american option?
-    :param payoff: payoff function of an option.
+    :param call: is it a call option? Otherwise, put.
     :returns: tuple of price of an option and a binomial tree.
     """
+    payoff = call_payoff if call else put_payoff
     # Number of levels of a binomial tree.
     n = int(T / delta_t)
     # Risk-neutral probability.
@@ -156,99 +155,11 @@ def _price_option(r: float, S: float, K: float,
     return value[0], history  # [0] to unpack array with one element
 
 
-def price_european_put(r: float, S: float, K: float, delta_t: float,
-                       T: float, up: float, down: float) -> tuple[ndarray, list]:
-    """Price a european put@K with maturity T.
-
-    Prices a european put option given the underlying
-    asset and market parameters. We assume discrete time steps and a
-    lattice of available prices for the asset.
-    It returns a tuple containing present price and a binomial tree
-    with option prices at each node.
-
-    :param r: risk-free rate of the market.
-    :param S: current underlying asset price.
-    :param K: strike price.
-    :param delta_t: time step (in years).
-    :param T: maturity of an option (in years).
-    :param up: price up-scaling factor.
-    :param down: price down-scaling factor.
-    :returns: tuple of price of an option and a binomial tree.
-    """
-    return _price_option(r, S, K, delta_t, T, up, down, payoff=put_payoff)
-
-
-def price_european_call(r: float, S: float, K: float, delta_t: float,
-                        T: float, up: float, down: float) -> tuple[ndarray, list]:
-    """Price a european call@K with maturity T.
-
-    Prices a european call option given the underlying
-    asset and market parameters. We assume discrete time steps and a
-    lattice of available prices for the asset.
-    It returns a tuple containing present price and a binomial tree
-    with option prices at each node.
-
-    :param r: risk-free rate of the market.
-    :param S: current underlying asset price.
-    :param K: strike price.
-    :param delta_t: time step (in years).
-    :param T: maturity of an option (in years).
-    :param up: price up-scaling factor.
-    :param down: price down-scaling factor.
-    :returns: tuple of price of an option and a binomial tree.
-    """
-    return _price_option(r, S, K, delta_t, T, up, down, payoff=call_payoff)
-
-
-def price_american_put(r: float, S: float, K: float, delta_t: float,
-                       T: float, up: float, down: float) -> tuple[ndarray, list]:
-    """Price an american put@K with maturity T.
-
-    Prices a american put option given the underlying
-    asset and market parameters. We assume discrete time steps and a
-    lattice of available prices for the asset.
-    It returns a tuple containing present price and a binomial tree
-    with option prices at each node.
-
-    :param r: risk-free rate of the market.
-    :param S: current underlying asset price.
-    :param K: strike price.
-    :param delta_t: time step (in years).
-    :param T: maturity of an option (in years).
-    :param up: price up-scaling factor.
-    :param down: price down-scaling factor.
-    :returns: tuple of price of an option and a binomial tree.
-    """
-    return _price_option(r, S, K, delta_t, T, up, down, american=True, payoff=put_payoff)
-
-
-def price_american_call(r: float, S: float, K: float, delta_t: float,
-                        T: float, up: float, down: float) -> tuple[ndarray, list]:
-    """Price an american call@K with maturity T.
-
-    Prices a american put option given the underlying
-    asset and market parameters. We assume discrete time steps and a
-    lattice of available prices for the asset.
-    It returns a tuple containing present price and a binomial tree
-    with option prices at each node.
-
-    :param r: risk-free rate of the market.
-    :param S: current underlying asset price.
-    :param K: strike price.
-    :param delta_t: time step (in years).
-    :param T: maturity of an option (in years).
-    :param up: price up-scaling factor.
-    :param down: price down-scaling factor.
-    :returns: tuple of price of an option and a binomial tree.
-    """
-    return _price_option(r, S, K, delta_t, T, up, down, american=True, payoff=call_payoff)
-
-
 def crr_price_option(r: float, S: float, K: float, delta_t: float, T: float,
                      sigma: float, american: bool = False, call: bool = True) -> tuple[ndarray, list]:
-    """Price a european put@K with maturity T.
+    """Price a option@K with maturity T.
 
-    Prices a european put option given the underlying asset and market parameters.
+    Prices a european/american call/put option given the underlying asset and market parameters.
     We assume discrete time steps and a lattice of available prices for the asset.
 
     Use Cox, Ross and Rubinstein method to obtain up and down factors
@@ -270,8 +181,7 @@ def crr_price_option(r: float, S: float, K: float, delta_t: float, T: float,
     """
     up = np.exp(sigma * np.sqrt(delta_t))
     down = 1/up
-    payoff = call_payoff if call else put_payoff
-    return _price_option(r, S, K, delta_t, T, up, down, american, payoff)
+    return price_option(r, S, K, delta_t, T, up, down, american, call)
 
 
 if __name__ == "__main__":
