@@ -102,9 +102,29 @@ def price_binomial_tree(S: float, delta_t: float, T: float,
     return tree
 
 
+def hedge_node(r: float, S: ndarray, t: float, up: float, down: float,
+               value_up: ndarray, value_down: ndarray) -> ndarray:
+    """Get hedging portfolio at given nodes.
+
+    :param r: risk-free rate of the market.
+    :param S: current underlying asset price.
+    :param t: time period (in years).
+    :param up: price up-scaling factor.
+    :param down: price down-scaling factor.
+    :param value_down: value of an option at down child.
+    :param value_up: value of an option at upper child.
+    :returns: hedging portfolio at present node as tuple (asset, cash).
+    """
+    delta = (value_up - value_down) / (up - down) / S
+    alpha = (value_up - delta * S * up) / np.exp(r*t)
+    # Join the vectors. Numpy does it by rows, so we need to transpose it (.T).
+    return np.array([delta, alpha]).T
+
+
 def price_option(r: float, S: float, K: float, delta_t: float,
                  T: float, up: float, down: float,
-                 american: bool = False, call: bool = True) -> tuple[ndarray, list[ndarray]]:
+                 american: bool = False, call: bool = True) \
+        -> tuple[ndarray, list[ndarray], list[ndarray]]:
     """Price an option@K with maturity T.
 
     Prices a european/american vanilla options given the underlying
@@ -122,7 +142,7 @@ def price_option(r: float, S: float, K: float, delta_t: float,
     :param down: price down-scaling factor.
     :param american: is it american option?
     :param call: is it a call option? Otherwise, put.
-    :returns: tuple of price of an option and a binomial tree.
+    :returns: tuple of price of an option, price binomial tree and tree of hedging portfolios.
     """
     payoff = call_payoff if call else put_payoff
     # Number of levels of a binomial tree.
@@ -133,13 +153,16 @@ def price_option(r: float, S: float, K: float, delta_t: float,
     tree = price_binomial_tree(S, delta_t, T, up, down)
     # Values of an option at leafs (last level of the tree).
     value = payoff(tree[n], K)
-    # Store each level of the tree.
+    # Store each level of the tree of values.
     history = [value]
+    # Store each level of the hedging portfolio tree.
+    hedging_portfolio = []
 
     for i in range(n):
         value_up = np.delete(value, 0)  # remove first, so that we have v_i+1
         value_down = np.delete(value, n-i)  # remove last, so that we have v_i,
         value = expected_payoff(r, delta_t, up, down, p, value_up, value_down)
+        hedge = hedge_node(r, tree[n - i - 1], delta_t, up, down, value_up, value_down)
 
         if american:  # if american, check if it's profitable to exercise option.
             # Expected and actual payoffs at current tree level.
@@ -150,9 +173,12 @@ def price_option(r: float, S: float, K: float, delta_t: float,
             value = np.max(profitability, axis=0)
 
         history.append(value)
+        hedging_portfolio.append(hedge)
 
+    hedging_portfolio.reverse()
+    hedging_portfolio[0] = hedging_portfolio[0][0]  # unpack only first level.
     history.reverse()
-    return value[0], history  # [0] to unpack array with one element
+    return value[0], history, hedging_portfolio  # [0] to unpack array with one element
 
 
 def crr_price_option(r: float, S: float, K: float, delta_t: float, T: float,
@@ -182,25 +208,6 @@ def crr_price_option(r: float, S: float, K: float, delta_t: float, T: float,
     up = np.exp(sigma * np.sqrt(delta_t))
     down = 1/up
     return price_option(r, S, K, delta_t, T, up, down, american, call)
-
-
-def hedge_node(r: float, S: ndarray, t: float, up: float, down: float,
-               value_up: ndarray, value_down: ndarray) -> ndarray:
-    """Get hedging portfolio at given nodes.
-
-    :param r: risk-free rate of the market.
-    :param S: current underlying asset price.
-    :param t: time period (in years).
-    :param up: price up-scaling factor.
-    :param down: price down-scaling factor.
-    :param value_down: value of an option at down child.
-    :param value_up: value of an option at upper child.
-    :returns: hedging portfolio at present node as tuple (asset, cash).
-    """
-    delta = (value_up - value_down) / (up - down) / S
-    alpha = (value_up - delta * S * up) / np.exp(r*t)
-    # Join the vectors. Numpy does it by rows, so we need to transpose it (.T).
-    return np.array([delta, alpha]).T
 
 
 if __name__ == "__main__":

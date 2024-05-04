@@ -91,7 +91,7 @@ def test_price_binomial_tree(S, delta_t, T, up, down, tree):
                          [(.12, 20, 21, 3/12, 1/2, 1.1, 0.9, 1.28),
                           (.05, 50, 52, 1, 2, 1.2, 0.8, 7.1416)])
 def test_price_european_call(r, S, K, delta_t, T, up, down, value):
-    v, _ = bopm.price_option(r, S, K, delta_t, T, up, down, american=False, call=True)
+    v, _, _ = bopm.price_option(r, S, K, delta_t, T, up, down, american=False, call=True)
     return assert_allclose(actual=v, desired=value, rtol=1e-2)
 
 
@@ -99,7 +99,7 @@ def test_price_european_call(r, S, K, delta_t, T, up, down, value):
                          [(.12, 20, 21, 3/12, 1/2, 1.1, 0.9, 1.28),
                           (.05, 50, 52, 1, 2, 1.2, 0.8, 7.1416)])
 def test_price_american_call(r, S, K, delta_t, T, up, down, value):
-    v, _ = bopm.price_option(r, S, K, delta_t, T, up, down, american=True, call=True)
+    v, _, _ = bopm.price_option(r, S, K, delta_t, T, up, down, american=True, call=True)
     return assert_allclose(actual=v, desired=value, rtol=1e-2)
 
 
@@ -107,7 +107,7 @@ def test_price_american_call(r, S, K, delta_t, T, up, down, value):
                          [(.12, 20, 21, 3/12, 1/2, 1.1, 0.9, 1.0591),
                           (.05, 50, 52, 1, 2, 1.2, 0.8, 4.1923)])
 def test_price_european_put(r, S, K, delta_t, T, up, down, value):
-    v, _ = bopm.price_option(r, S, K, delta_t, T, up, down, american=False, call=False)
+    v, _, _ = bopm.price_option(r, S, K, delta_t, T, up, down, american=False, call=False)
     return assert_allclose(actual=v, desired=value, rtol=1e-2)
 
 
@@ -115,7 +115,7 @@ def test_price_european_put(r, S, K, delta_t, T, up, down, value):
                          [(.12, 20, 21, 3/12, 1/2, 1.1, 0.9, 1.2686),
                           (.05, 50, 52, 1, 2, 1.2, 0.8, 5.089)])
 def test_price_american_put(r, S, K, delta_t, T, u, d, value):
-    v, _ = bopm.price_option(r, S, K, delta_t, T, u, d, american=True, call=False)
+    v, _, _ = bopm.price_option(r, S, K, delta_t, T, u, d, american=True, call=False)
     return assert_allclose(actual=v, desired=value, rtol=1e-2)
 
 
@@ -128,7 +128,7 @@ def test_price_american_put(r, S, K, delta_t, T, u, d, value):
                          [(.12, 20, 21, 3/12, 1/2, np.log(1.1)/np.sqrt(3/12), 1.28),
                           (.05, 50, 52, 1, 2, np.log(1.2)/np.sqrt(1), 4.1923)])
 def test_crr_european_put(r, S, K, delta_t, T, sigma, value):
-    v, _ = bopm.crr_price_option(r, S, K, delta_t, T, sigma, american=False, call=False)
+    v, _, _ = bopm.crr_price_option(r, S, K, delta_t, T, sigma, american=False, call=False)
     return assert_allclose(actual=v, desired=value, atol=.75)
 
 
@@ -154,3 +154,14 @@ def test_hedge_node_scalar(r, S, t, up, down, value_up, value_down, hedge):
 def test_hedge_node_vector(r, S, t, up, down, value_up, value_down, hedge):
     h = bopm.hedge_node(r, S, t, up, down, value_up, value_down)
     return assert_allclose(actual=h, desired=hedge, rtol=1e-2)
+
+
+@pytest.mark.parametrize("r, S, K, delta_t, T, u, d, hedging_tree",
+                         [(.12, 20, 21, 3/12, 1/2, 1.1, 0.9,
+                           [np.array((0.5075, -8.865)), np.array([(0, 0), (0.727, -13.969)]) ]
+                           )]
+                         )
+def test_delta_hedging(r, S, K, delta_t, T, u, d, hedging_tree):
+    n = len(hedging_tree)
+    _, _, h = bopm.price_option(r, S, K, delta_t, T, u, d, american=False, call=True)
+    assert all(np.allclose(h[i], hedging_tree[i], rtol=1e-2) for i in range(n))
