@@ -184,6 +184,24 @@ def crr_price_option(r: float, S: float, K: float, delta_t: float, T: float,
     return price_option(r, S, K, delta_t, T, up, down, american, call)
 
 
+def hedge_node(r: float, S: ndarray, t: float, up: float, down: float,
+               value_up: ndarray, value_down: ndarray) -> ndarray:
+    """Get hedging portfolio at given nodes.
+
+    :param r: risk-free rate of the market.
+    :param S: current underlying asset price.
+    :param t: time period (in years).
+    :param up: price up-scaling factor.
+    :param down: price down-scaling factor.
+    :param value_down: value of an option at down child.
+    :param value_up: value of an option at upper child.
+    :returns: hedging portfolio at present node as tuple (asset, cash).
+    """
+    delta = (value_up - value_down) / (up - down) / S
+    alpha = (value_up - delta * S * up) / np.exp(r*t)
+    # Join the vectors. Numpy does it by rows, so we need to transpose it (.T).
+    return np.array([delta, alpha]).T
+
+
 if __name__ == "__main__":
     r, S, K, delta_t, T, sigma = .02, 50, 40, 1/12, 2, .3
-
