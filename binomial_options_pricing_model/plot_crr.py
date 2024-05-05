@@ -43,6 +43,15 @@ def plot_crr_price_functions(r, S, K, delta_t, T, sigma, domain, price_functions
         # axis[i%2, i%3].plot(param, V_am_call, color="blue")
         axis[i % 2, i % 3].plot(param, V_am_put, color="red", linestyle="dashed")
 
+        # Add inequalities to V_K and V_S.
+        # call >= S - Ke^(-rT), put >= Ke^(-rT) - S
+        if i == 1:
+            axis[i % 2, i % 3].plot(param, param - K * np.exp(-r * T), color="blue", linestyle="dotted")
+            axis[i % 2, i % 3].plot(param, K * np.exp(-r * T) - param, color="red", linestyle="dotted")
+        elif i == 2:
+            axis[i % 2, i % 3].plot(param, S - param * np.exp(-r * T), color="blue", linestyle="dotted")
+            axis[i % 2, i % 3].plot(param, param * np.exp(-r * T) - S, color="red", linestyle="dotted")
+
         axis[i % 2, i % 3].set_xlabel(x_labels[i])
         axis[i % 2, i % 3].set_ylabel("Option value V")
         axis[i % 2, i % 3].legend(["EU=AM call", "EU put", "AM put"])
@@ -53,7 +62,7 @@ def plot_crr_price_functions(r, S, K, delta_t, T, sigma, domain, price_functions
 if __name__ == "__main__":
     from bopm_crr_price_functions import crr_price_functions
 
-    r, S, K, delta_t, T, sigma = .02, 50, 48, 1 / 12, 2, .3
+    r, S, K, delta_t, T, sigma = .02, 50, 52, 1 / 12, 2, .3
     domain = (0.8, 1.2)
     price_functions = crr_price_functions(r, S, K, delta_t, T, sigma)
 
