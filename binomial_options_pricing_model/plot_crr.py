@@ -62,8 +62,8 @@ def plot_crr_price_functions(r, S, K, delta_t, T, sigma, domain, price_functions
 if __name__ == "__main__":
     from bopm_crr_price_functions import crr_price_functions
 
-    r, S, K, delta_t, T, sigma = .02, 50, 52, 1 / 12, 2, .3
-    domain = (0.8, 1.2)
+    r, S, K, delta_t, T, sigma = .02, 50, 48, 1 / 12, 2, .3
+    domain = (0.4, 1.5)
     price_functions = crr_price_functions(r, S, K, delta_t, T, sigma)
 
     plot_crr_price_functions(r, S, K, delta_t, T, sigma, domain, price_functions)
